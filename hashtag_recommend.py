@@ -30,9 +30,25 @@ def get_insta_image(id):
 
 
 # list of the user dataset
-user_list = ['godjp']
+user_list = [
+        'godjp'
+        #'chagungwoo'
+             ]
+
+def flatten_words(words):
+    result = []
+    print(words)
+    for big_word in words:
+        for word in big_word:
+            if word[1] == 'NNG' or word[1] == 'NNP':
+                result.append(word[0])
+    return result
 
 def get_hash_data(name, dir_name):
+    id_list = []
+    img_list = []
+    post_list = []
+    
     kkma = Kkma()
     filename = os.path.join(os.getcwd(), dir_name, name + '.csv')
     with open(filename, 'r', encoding='utf-8') as file:
@@ -43,44 +59,52 @@ def get_hash_data(name, dir_name):
         
         # for each row, extract post_id and hashtags
         for line in reader:
+            # extract id from row
             post_id = line[0].split('/')[4]
-            print(post_id)
+            id_list.append(post_id)
+            
+            # download and extract image from row
             if not os.path.isfile('./images/'+post_id+'.jpg'):
                 get_insta_image(post_id)
                 print("donwload: " + post_id)
-            #print(post_id)
+            image = Image.open('./images/'+post_id+'.jpg').resize((320, 320))
+            image = np.array(image)
+            image = preprocess_input(image)
+            img_list.append(image)
+            
+            # extract tags and change it into training set
             tags = line[1].split('#')[1:]
+            post_sentence = []
             for tag in tags:
                 words = kkma.pos(tag, flatten=False)
                 #print(tag, words)
                 if len(words) > 1:
-                    pass
-                    #print(tag, words)    
+                    post_sentence += flatten_words(words)
+            post_list.append(post_sentence)
+    return id_list, np.array(img_list), post_list
 
 for user in user_list:
-    get_hash_data(user, 'data')
+    id_list, img_list, training_data = get_hash_data(user, 'data')
 
-
-
-# set image to fixed size
-image = Image.open('./images/BscipNvFcqi.jpg').resize((320, 320))
-image = np.array(image)
-image = preprocess_input(image)
+model_word = Word2Vec(training_data, size=100, min_count=5, iter=100)
+model_word.wv['제주']
 
 # get image feature from pretrained model
 model = VGG19(weights='imagenet', include_top=False)
-feature = model.predict(image.reshape((1, 320, 320, 3)))
+feature_list = model.predict(img_list)
 
+# get nearest neighbor's hashtags
+def nearest_neighbor_image(image):
+    min_index = 0
+    min_dist = np.linalg.norm(image - feature_list[0])
+    for i in range(1, len(feature_list)):
+        dist = np.linalg.norm(image - feature_list[i])
+        if dist < min_dist:
+            min_index = i
+            min_dist = dist
+    return training_data[min_index]
 
-
-
-
-model = api.load('glove-twitter-50')
-vec_woman = np.array(model['woman'])
-vec_woman -= 0.1
-model.wv.most_similar(positive=[vec_woman], topn=3)
-
-kkma = Kkma()
-print(kkma.pos('절대신뢰'))
-
-
+# test input data which is a first entry of the feature list
+input_feature = feature_list[0]
+nearest_neighbor_image(input_feature)
+        

@@ -31,8 +31,16 @@ def get_insta_image(id):
 
 # list of the user dataset
 user_list = [
-        'godjp'
-        #'chagungwoo'
+        '먹스타그램',
+        '미용',
+        '반려동물',
+        '셀카',
+        '운동',
+        '육아',
+        '일상',
+        '코디',
+        '풍경',
+        '휴가'
              ]
 
 def flatten_words(words):
@@ -44,13 +52,14 @@ def flatten_words(words):
                 result.append(word[0])
     return result
 
-def get_hash_data(name, dir_name):
+def get_hash_data(name, dir_name, image_limit):
     id_list = []
     img_list = []
     post_list = []
     
     kkma = Kkma()
     filename = os.path.join(os.getcwd(), dir_name, name + '.csv')
+    image_cnt = 0
     with open(filename, 'r', encoding='utf-8') as file:
         reader = csv.reader(file)
         
@@ -64,13 +73,16 @@ def get_hash_data(name, dir_name):
             id_list.append(post_id)
             
             # download and extract image from row
-            if not os.path.isfile('./images/'+post_id+'.jpg'):
-                get_insta_image(post_id)
-                print("donwload: " + post_id)
-            image = Image.open('./images/'+post_id+'.jpg').resize((320, 320))
-            image = np.array(image)
-            image = preprocess_input(image)
-            img_list.append(image)
+            # when the image count is less then image limit
+            if image_cnt < image_limit:
+                if not os.path.isfile('./images/'+post_id+'.jpg'):
+                    get_insta_image(post_id)
+                    print("donwload: " + post_id)
+                image = Image.open('./images/'+post_id+'.jpg').resize((320, 320))
+                image = np.array(image)
+                image = preprocess_input(image)
+                img_list.append(image)
+                image_cnt += 1
             
             # extract tags and change it into training set
             tags = line[1].split('#')[1:]
@@ -84,7 +96,7 @@ def get_hash_data(name, dir_name):
     return id_list, np.array(img_list), post_list
 
 for user in user_list:
-    id_list, img_list, training_data = get_hash_data(user, 'data')
+    id_list, img_list, training_data = get_hash_data(user, 'data', 500)
 
 model_word = Word2Vec(training_data, size=100, min_count=5, iter=100)
 model_word.wv['제주']

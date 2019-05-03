@@ -21,8 +21,6 @@ from keras.applications.vgg19 import VGG19
 from keras.applications.vgg19 import preprocess_input
 from scipy import spatial
 
-import heapq
-
 
 def get_insta_image(id):
     img_data = requests.get('https://www.instagram.com/p/' + id + '/media/?size=m').content
@@ -128,8 +126,7 @@ training_file_list = [
              ]
 
 test_file_list = [
-        'chagungwoo',
-        'i_am_tofu'
+        'chagungwoo'
         ]
 
 image_limit = 300
@@ -165,73 +162,65 @@ for test_file in test_file_list[1:]:
 
 model_word = Word2Vec(total_post_list, size=100, min_count=5)
 
+def exist_split(test_post_list):
+    #tokenize with existing tag
+    list_cnt = len(test_post_list)
+    for j in range(list_cnt):
+        try:
+            token = test_post_list[j]
+        except:
+            break
+        for k in range(j + 1, list_cnt):
+            try:
+                split_token = test_post_list[k].split(token)
+            except:
+                break
+            if len(split_token) > 1:
+                del test_post_list[k]
+                insert_idx = 0
+                for m in range(len(split_token)):
+                    if split_token[m] != '' and len(split_token[m]) > 1:
+                        test_post_list.insert(k + insert_idx, split_token[m])
+                        insert_idx += 1
+            if list_cnt != test_post_list:
+                list_cnt = len(test_post_list)
+    list_cnt = len(test_post_list)
+    for j in range(list_cnt - 1, 0, -1):   
+        for k in range(list_cnt - 2, j, -1):
+            try:
+                split_token = test_post_list[k].split(token)
+            except:
+                break
+            if len(split_token) > 1:
+                del test_post_list[k]
+                insert_idx = 0
+                for m in range(len(split_token)):
+                    if split_token[m] != '' and len(split_token[m]) > 1:
+                        test_post_list.insert(k + insert_idx, split_token[m])
+                        insert_idx += 1
+            if list_cnt != test_post_list:
+                list_cnt = len(test_post_list)
+    return test_post_list
+
 # get nearest neighbor's hashtags
 def nearest_neighbor_image(image):
-    k = 3
-    min_heap = []
-    for i in range(k):
-        heapq.heappush(min_heap, (spatial.distance.cosine(image.flatten(), total_img_list[i].flatten()), i))
-    
-    largest_item = heapq.nlargest(1, min_heap)[0]
-    for i in range(k, len(total_img_list)):
-        sim = spatial.distance.cosine(image.flatten(), total_img_list[i].flatten())
-        if sim < largest_item[0]:
-            largest_item = heapq.heappushpop(min_heap, (sim, i))
-    
-    return min_heap
+    min_index = 0
+    max_sim = 1 - spatial.distance.cosine(image.flatten(), total_img_list[0].flatten())
+    for i in range(1, len(total_img_list)):
+        sim = 1 - spatial.distance.cosine(image.flatten(), total_img_list[i].flatten())
+        if sim > max_sim:
+            min_index = i
+            max_sim = sim
+    return min_index
 
 # test input data which is a first entry of the feature list
 for i in range(len(test_img_list)):
     print(i)
     idx = nearest_neighbor_image(test_img_list[i])
-    
-    print(idx)
     idx = idx // image_limit * post_limit + idx % image_limit
-    print(idx)
     print('input post: ' + test_id_list[i])
-    
-    #tokenize with existing tag
-    list_cnt = len(test_post_list[i])
-    for j in range(list_cnt):
-        try:
-            token = test_post_list[i][j]
-        except:
-            break
-        for k in range(j + 1, list_cnt):
-            print(token)
-            try:
-                split_token = test_post_list[i][k].split(token)
-            except:
-                break
-            if len(split_token) > 1:
-                del test_post_list[i][k]
-                insert_idx = 0
-                for m in range(len(split_token)):
-                    if split_token[m] != '' and len(split_token[m]) > 1:
-                        test_post_list[i].insert(k + insert_idx, split_token[m])
-                        insert_idx += 1
-            if list_cnt != test_post_list[i]:
-                list_cnt = len(test_post_list[i])
-    list_cnt = len(test_post_list[i])
-    for j in range(list_cnt - 1, 0, -1):   
-        for k in range(list_cnt - 2, j, -1):
-            try:
-                split_token = test_post_list[i][k].split(token)
-                print(split_token)
-            except:
-                break
-            if len(split_token) > 1:
-                del test_post_list[i][k]
-                insert_idx = 0
-                for m in range(len(split_token)):
-                    if split_token[m] != '' and len(split_token[m]) > 1:
-                        test_post_list[i].insert(k + insert_idx, split_token[m])
-                        insert_idx += 1
-            if list_cnt != test_post_list[i]:
-                list_cnt = len(test_post_list[i])
-    
     print(test_post_list[i])
+    print("after tokenizing with existing tag")
+    print(exist_split(test_post_list[i]))
     print('neighbor post: ' + total_id_list[idx])
     print(total_post_list[idx])
-    
-        

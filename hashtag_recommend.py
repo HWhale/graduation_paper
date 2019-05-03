@@ -15,9 +15,11 @@ import csv
 from matplotlib import pyplot as plt
 from PIL import Image
 import keras
+from keras.models import Model
 
 from keras.applications.vgg19 import VGG19
 from keras.applications.vgg19 import preprocess_input
+from scipy import spatial
 
 
 def get_insta_image(id):
@@ -40,7 +42,8 @@ def flatten_words(words):
     return result
 
 # get image feature from pretrained model
-model = VGG19(weights='imagenet', include_top=False)
+base_model = VGG19(weights='imagenet')
+model = Model(inputs=base_model.input, outputs=base_model.get_layer('block4_pool').output)
 
 def get_hash_data(name, dir_name, image_limit, post_limit):
     id_list = []
@@ -59,9 +62,13 @@ def get_hash_data(name, dir_name, image_limit, post_limit):
         
         # for each row, extract post_id and hashtags
         for line in reader:
+            # if tag does not exist, skip current row
+            tags = line[1].split('#')[1:]
+            if len(tags) < 2:
+                continue
+            
             # extract id from row
             post_id = line[0].split('/')[4]
-            id_list.append(post_id)
             
             # download and extract image from row
             # when the image count is less then image limit
@@ -70,7 +77,7 @@ def get_hash_data(name, dir_name, image_limit, post_limit):
                     get_insta_image(post_id)
                     print("donwload: " + post_id)
                 try:
-                    image = Image.open('./images/'+post_id+'.jpg').resize((320, 320))
+                    image = Image.open('./images/'+post_id+'.jpg').resize((224, 224))
                 except:
                     print("Doesn't exist: " + post_id)
                     continue
@@ -81,7 +88,6 @@ def get_hash_data(name, dir_name, image_limit, post_limit):
                     image_cnt += 1
             
             # extract tags and change it into training set
-            tags = line[1].split('#')[1:]
             post_sentence = []
             for tag in tags:
                 post_sentence.append(tag)
@@ -90,6 +96,9 @@ def get_hash_data(name, dir_name, image_limit, post_limit):
                 #if len(words) > 1:
                 #   post_sentence += flatten_words(words)
             post_list.append(post_sentence)
+        
+            id_list.append(post_id)
+            
             post_cnt += 1
             print(post_cnt)
             if post_cnt >= post_limit:
@@ -117,11 +126,12 @@ training_file_list = [
              ]
 
 test_file_list = [
-        'chagungwoo'
+        'chagungwoo',
+        'i_am_tofu'
         ]
 
-image_limit = 200
-post_limit = 1500
+image_limit = 300
+post_limit = 300
 
 # make a training dataset
 total_id_list, total_img_list, total_post_list = get_hash_data(training_file_list[0], 'data', image_limit, post_limit)
@@ -130,9 +140,21 @@ for training_file in training_file_list[1:]:
     total_id_list += id_list
     total_img_list = np.append(total_img_list, img_list, axis=0)
     total_post_list += post_list
+    
+#total_feature_list = model.predict(total_img_list)
+
+test_image_limit = 20
+test_post_limit = 20
 
 # make a test dataset
 test_id_list, test_img_list, test_post_list = get_hash_data(test_file_list[0], 'data', image_limit, post_limit)
+for test_file in test_file_list[1:]:
+    id_list, img_list, post_list = get_hash_data(test_file, 'data', test_image_limit, test_post_limit)
+    test_id_list += id_list
+    test_img_list = np.append(test_img_list, img_list, axis=0)
+    test_post_list += post_list
+
+#test_feature_list = model.predict(test_img_list)
 
 # length of total_img_list is gonna be a multiple of image_limit
 # length of total_post_list is gonna be a multiple of post_limit
@@ -144,19 +166,23 @@ model_word = Word2Vec(total_post_list, size=100, min_count=5)
 # get nearest neighbor's hashtags
 def nearest_neighbor_image(image):
     min_index = 0
-    min_dist = np.linalg.norm(image - total_img_list[0])
+    max_sim = 1 - spatial.distance.cosine(image.flatten(), total_img_list[0].flatten())
     for i in range(1, len(total_img_list)):
-        dist = np.linalg.norm(image - total_img_list[i])
-        if dist < min_dist:
+        sim = 1 - spatial.distance.cosine(image.flatten(), total_img_list[i].flatten())
+        if sim > max_sim:
             min_index = i
-            min_dist = dist
+            max_sim = sim
+    
     return min_index
 
 # test input data which is a first entry of the feature list
 for i in range(len(test_img_list)):
+    print(i)
     idx = nearest_neighbor_image(test_img_list[i])
     
+    print(idx)
     idx = idx // image_limit * post_limit + idx % image_limit
+    print(idx)
     print('input post: ' + test_id_list[i])
     print(test_post_list[i])
     print('neighbor post: ' + total_id_list[idx])

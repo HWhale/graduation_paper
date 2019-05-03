@@ -21,6 +21,8 @@ from keras.applications.vgg19 import VGG19
 from keras.applications.vgg19 import preprocess_input
 from scipy import spatial
 
+import heapq
+
 
 def get_insta_image(id):
     img_data = requests.get('https://www.instagram.com/p/' + id + '/media/?size=m').content
@@ -165,15 +167,18 @@ model_word = Word2Vec(total_post_list, size=100, min_count=5)
 
 # get nearest neighbor's hashtags
 def nearest_neighbor_image(image):
-    min_index = 0
-    max_sim = 1 - spatial.distance.cosine(image.flatten(), total_img_list[0].flatten())
-    for i in range(1, len(total_img_list)):
-        sim = 1 - spatial.distance.cosine(image.flatten(), total_img_list[i].flatten())
-        if sim > max_sim:
-            min_index = i
-            max_sim = sim
+    k = 3
+    min_heap = []
+    for i in range(k):
+        heapq.heappush(min_heap, (spatial.distance.cosine(image.flatten(), total_img_list[i].flatten()), i))
     
-    return min_index
+    largest_item = heapq.nlargest(1, min_heap)[0]
+    for i in range(k, len(total_img_list)):
+        sim = spatial.distance.cosine(image.flatten(), total_img_list[i].flatten())
+        if sim < largest_item[0]:
+            largest_item = heapq.heappushpop(min_heap, (sim, i))
+    
+    return min_heap
 
 # test input data which is a first entry of the feature list
 for i in range(len(test_img_list)):

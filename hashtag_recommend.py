@@ -5,8 +5,6 @@ Created on Wed May  1 11:33:00 2019
 @author: sungpil
 """
 
-import gensim.downloader as api
-#from konlpy.tag import Kkma
 from gensim.models import Word2Vec
 import numpy as np
 import requests
@@ -14,8 +12,9 @@ import os
 import csv
 from matplotlib import pyplot as plt
 from PIL import Image
-import keras
 from keras.models import Model
+import heapq
+import token_processor as tp
 
 from keras.applications.vgg19 import VGG19
 from keras.applications.vgg19 import preprocess_input
@@ -29,17 +28,6 @@ def get_insta_image(id):
     with open('./images/' + id + '.jpg' , 'wb') as handler:
         handler.write(img_data)
 
-
-
-
-def flatten_words(words):
-    result = []
-    #print(words)
-    for big_word in words:
-        for word in big_word:
-            if word[1] == 'NNG' or word[1] == 'NNP':
-                result.append(word[0])
-    return result
 
 # get image feature from pretrained model
 base_model = VGG19(weights='imagenet')

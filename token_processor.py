@@ -21,6 +21,45 @@ def split_combine_tag(tags, tokens):
         if len(token_list) >= 2:
             combined_tags.append(token_list)
     return combined_tags
-            
+
+def exist_split(test_post_list):
+    #tokenize with existing tag
+    list_cnt = len(test_post_list)
+    for j in range(list_cnt):
+        try:
+            token = test_post_list[j]
+        except:
+            break
+        for k in range(j + 1, list_cnt):
+            try:
+                split_token = test_post_list[k].split(token)
+            except:
+                break
+            if len(split_token) > 1:
+                del test_post_list[k]
+                insert_idx = 0
+                for m in range(len(split_token)):
+                    if split_token[m] != '' and len(split_token[m]) > 1:
+                        test_post_list.insert(k + insert_idx, split_token[m])
+                        insert_idx += 1
+            if list_cnt != test_post_list:
+                list_cnt = len(test_post_list)
+    list_cnt = len(test_post_list)
+    for j in range(list_cnt - 1, 0, -1):   
+        for k in range(list_cnt - 2, j, -1):
+            try:
+                split_token = test_post_list[k].split(token)
+            except:
+                break
+            if len(split_token) > 1:
+                del test_post_list[k]
+                insert_idx = 0
+                for m in range(len(split_token)):
+                    if split_token[m] != '' and len(split_token[m]) > 1:
+                        test_post_list.insert(k + insert_idx, split_token[m])
+                        insert_idx += 1
+            if list_cnt != test_post_list:
+                list_cnt = len(test_post_list)
+    return test_post_list
     
 #print(split_combine_tag(tags, tokens))

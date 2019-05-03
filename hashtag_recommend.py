@@ -126,7 +126,8 @@ training_file_list = [
              ]
 
 test_file_list = [
-        'chagungwoo'
+        'chagungwoo',
+        'i_am_tofu'
         ]
 
 image_limit = 300
@@ -203,24 +204,27 @@ def exist_split(test_post_list):
     return test_post_list
 
 # get nearest neighbor's hashtags
-def nearest_neighbor_image(image):
-    min_index = 0
-    max_sim = 1 - spatial.distance.cosine(image.flatten(), total_img_list[0].flatten())
-    for i in range(1, len(total_img_list)):
-        sim = 1 - spatial.distance.cosine(image.flatten(), total_img_list[i].flatten())
-        if sim > max_sim:
-            min_index = i
-            max_sim = sim
-    return min_index
+def nearest_neighbor_image(image, k):
+    min_heap = []
+    for i in range(k):
+        heapq.heappush(min_heap, (spatial.distance.cosine(image.flatten(), total_img_list[i].flatten()), i))
+    
+    largest_item = heapq.nlargest(1, min_heap)[0]
+    for i in range(k, len(total_img_list)):
+        sim = spatial.distance.cosine(image.flatten(), total_img_list[i].flatten())
+        if sim < largest_item[0]:
+            largest_item = heapq.heappushpop(min_heap, (sim, i))
+    
+    return min_heap
 
 # test input data which is a first entry of the feature list
 for i in range(len(test_img_list)):
     print(i)
-    idx = nearest_neighbor_image(test_img_list[i])
-    idx = idx // image_limit * post_limit + idx % image_limit
+    neighbor_list = nearest_neighbor_image(test_img_list[i], 3)
+    #idx = idx // image_limit * post_limit + idx % image_limit
     print('input post: ' + test_id_list[i])
     print(test_post_list[i])
     print("after tokenizing with existing tag")
     print(exist_split(test_post_list[i]))
-    print('neighbor post: ' + total_id_list[idx])
-    print(total_post_list[idx])
+    #print('neighbor post: ' + total_id_list[idx])
+    #print(total_post_list[idx])

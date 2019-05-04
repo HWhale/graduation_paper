@@ -52,15 +52,11 @@ def subst_split(tag_list1):
         max_string = ''
         for j in range(len(tag_list1)):
             if j != i :
-                #print(len(cand[i]))
                 for k in range(len(cand[i])):
                     if len(tag_list1[j].split(cand[i][k])) > 1 and len(cand[i][k]) > max_length:
                         max_length = len(cand[i][k])
                         max_string = cand[i][k]
         if max_length > 1:
-            #print("i")
-            #print(i)
-            print(cand[i][k])
             try:
                 token.index(max_string)
             except:
@@ -72,8 +68,6 @@ def subst_split(tag_list1):
         token = exist_split(token)
         if origin == token:
             break
-    print(tag_list1)
-    print(token)
 
     for i in range(len(tag_list1)):
         for j in range(len(token)):
@@ -94,7 +88,6 @@ def subst_split(tag_list1):
                 result.append(token[j])
     result += token
     result = list(set(result))
-    #print(result)
     result1 = token
     while True:
         origin = result1
@@ -111,7 +104,6 @@ def subst_split(tag_list1):
         if len(result1) == len(origin):
             break
     result1 = list(set(result1))
-    print(result1)
     while True:
         origin = result1
         for i in range(len(result1)):
@@ -129,8 +121,6 @@ def subst_split(tag_list1):
         if origin == result1:
             break
     result1 = list(set(result1))
-    
-    print(result1)
     return result1
 
 print(subst_split(['평창한우마을','강원도맛집','한우맛집','강원도한우맛집','홍천맛집','평창맛집','강원도맛집평창한우마을','어버이날선물','어린이날외식','감사선물']))

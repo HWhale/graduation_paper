@@ -36,7 +36,9 @@ model = Model(inputs=base_model.input, outputs=base_model.get_layer('block4_pool
 def get_hash_data(name, dir_name, image_limit, post_limit):
     id_list = []
     img_list = []
-    post_list = []
+    tag_list = []
+    token_list = []
+    combined_list = []
     
     #kkma = Kkma()
     filename = os.path.join(os.getcwd(), dir_name, name + '.csv')
@@ -75,15 +77,21 @@ def get_hash_data(name, dir_name, image_limit, post_limit):
                     img_list.append(image)
                     image_cnt += 1
             
+            
+            # remove english tags
+            i = 0
+            while i < len(tags):
+                if tp.is_english(tags[i]):
+                    del tags[i]
+                else:
+                    i += 1
+                    
             # extract tags and change it into training set
-            post_sentence = []
-            for tag in tags:
-                post_sentence.append(tag)
-                #words = kkma.pos(tag, flatten=False)
-                #print(tag, words)
-                #if len(words) > 1:
-                #   post_sentence += flatten_words(words)
-            post_list.append(post_sentence)
+            tag_list.append(tags)
+            tokens = tp.subst_split(tags)
+            combined_tag = tp.split_combine_tag(tags, tokens)
+            token_list.append(tokens)
+            combined_list += combined_tag
         
             id_list.append(post_id)
             
@@ -96,7 +104,7 @@ def get_hash_data(name, dir_name, image_limit, post_limit):
     img_list = np.array(img_list)
     img_list = model.predict(img_list)
     
-    return id_list, img_list, post_list
+    return id_list, img_list, tag_list, token_list, combined_list
 
 
 # list of the user dataset
@@ -119,15 +127,18 @@ test_file_list = [
         ]
 
 image_limit = 300
-post_limit = 300
+post_limit = 1000
 
 # make a training dataset
-total_id_list, total_img_list, total_post_list = get_hash_data(training_file_list[0], 'data', image_limit, post_limit)
+total_id_list, total_img_list, total_tag_list, total_token_list, total_combined_list = get_hash_data(training_file_list[0], 'data', image_limit, post_limit)
 for training_file in training_file_list[1:]:
-    id_list, img_list, post_list = get_hash_data(training_file, 'data', image_limit, post_limit)
+    id_list, img_list, tag_list, token_list, combined_list = get_hash_data(training_file, 'data', image_limit, post_limit)
     total_id_list += id_list
     total_img_list = np.append(total_img_list, img_list, axis=0)
-    total_post_list += post_list
+    total_tag_list += tag_list
+    total_token_list += token_list
+    total_combined_list += combined_list
+    
     
 #total_feature_list = model.predict(total_img_list)
 
@@ -135,12 +146,14 @@ test_image_limit = 20
 test_post_limit = 20
 
 # make a test dataset
-test_id_list, test_img_list, test_post_list = get_hash_data(test_file_list[0], 'data', image_limit, post_limit)
+test_id_list, test_img_list, test_tag_list, test_token_list, test_combined_list = get_hash_data(test_file_list[0], 'data', image_limit, post_limit)
 for test_file in test_file_list[1:]:
-    id_list, img_list, post_list = get_hash_data(test_file, 'data', test_image_limit, test_post_limit)
+    id_list, img_list, tag_list, token_list, combined_list = get_hash_data(test_file, 'data', test_image_limit, test_post_limit)
     test_id_list += id_list
     test_img_list = np.append(test_img_list, img_list, axis=0)
-    test_post_list += post_list
+    test_tag_list += tag_list
+    test_token_list += token_list
+    test_combined_list += combined_list
 
 #test_feature_list = model.predict(test_img_list)
 
@@ -149,70 +162,49 @@ for test_file in test_file_list[1:]:
 # by using it, you can find the post index which is corresponding to given image index
 # image_index / image_limit * post_limit + image_index % image_limit
 
-model_word = Word2Vec(total_post_list, size=100, min_count=5)
+model_token = Word2Vec(total_token_list, window=100, min_count=50)
 
-def exist_split(test_post_list):
-    #tokenize with existing tag
-    list_cnt = len(test_post_list)
-    for j in range(list_cnt):
-        try:
-            token = test_post_list[j]
-        except:
-            break
-        for k in range(j + 1, list_cnt):
-            try:
-                split_token = test_post_list[k].split(token)
-            except:
-                break
-            if len(split_token) > 1:
-                del test_post_list[k]
-                insert_idx = 0
-                for m in range(len(split_token)):
-                    if split_token[m] != '' and len(split_token[m]) > 1:
-                        test_post_list.insert(k + insert_idx, split_token[m])
-                        insert_idx += 1
-            if list_cnt != test_post_list:
-                list_cnt = len(test_post_list)
-    list_cnt = len(test_post_list)
-    for j in range(list_cnt - 1, 0, -1):   
-        for k in range(list_cnt - 2, j, -1):
-            try:
-                split_token = test_post_list[k].split(token)
-            except:
-                break
-            if len(split_token) > 1:
-                del test_post_list[k]
-                insert_idx = 0
-                for m in range(len(split_token)):
-                    if split_token[m] != '' and len(split_token[m]) > 1:
-                        test_post_list.insert(k + insert_idx, split_token[m])
-                        insert_idx += 1
-            if list_cnt != test_post_list:
-                list_cnt = len(test_post_list)
-    return test_post_list
+# make a probability function by using combined word
+prob_dict = {}
+for combined in total_combined_list:
+    for i in range(len(combined) - 1):
+        word_before = combined[i]
+        word_after = combined[i+1]
+        tp.make_next_prob(prob_dict, word_before, word_after)
 
 # get nearest neighbor's hashtags
 def nearest_neighbor_image(image, k):
     min_heap = []
     for i in range(k):
-        heapq.heappush(min_heap, (spatial.distance.cosine(image.flatten(), total_img_list[i].flatten()), i))
+        heapq.heappush(min_heap, (1 - spatial.distance.cosine(image.flatten(), total_img_list[i].flatten()), i))
     
-    largest_item = heapq.nlargest(1, min_heap)[0]
     for i in range(k, len(total_img_list)):
-        sim = spatial.distance.cosine(image.flatten(), total_img_list[i].flatten())
-        if sim < largest_item[0]:
-            largest_item = heapq.heappushpop(min_heap, (sim, i))
+        heapq.heappushpop(min_heap, (1 - spatial.distance.cosine(image.flatten(), total_img_list[i].flatten()), i))
     
     return min_heap
 
 # test input data which is a first entry of the feature list
 for i in range(len(test_img_list)):
-    print(i)
-    neighbor_list = nearest_neighbor_image(test_img_list[i], 3)
-    #idx = idx // image_limit * post_limit + idx % image_limit
+    neighbor_list = nearest_neighbor_image(test_img_list[i], 5)
+    
     print('input post: ' + test_id_list[i])
-    print(test_post_list[i])
-    print("after tokenizing with existing tag")
-    print(exist_split(test_post_list[i]))
+    print(test_tag_list[i])
+    
+    neighbor_tokens = []
+    for neighbor in neighbor_list:
+        idx = neighbor[1]
+        idx = idx // image_limit * post_limit + idx % image_limit
+        print(total_id_list[idx])
+        neighbor_tokens.append(total_token_list[idx])
+        #print(total_token_list[neighbor_idx])
+    
+    main_words = tp.get_similar_words(model_token, neighbor_tokens, 0.99999)
+    print(main_words)
+    recommend_list = []
+    for main_word in main_words:
+        recommend_list += tp.extend_words(model_token, prob_dict, main_word, 0.999999, 0.40)
+    recommend_list = list(set(recommend_list))
+    print(recommend_list)
+    
     #print('neighbor post: ' + total_id_list[idx])
     #print(total_post_list[idx])

@@ -5,8 +5,6 @@ Created on Fri May  3 20:14:54 2019
 @author: sungpil
 """
 
-import heapq
-
 tags = ['평창한우마을', '강원도맛집', '한우맛집', '강원도한우맛집', '홍천맛집', '평창맛집', '강원도맛집평창한우마을', '어버이날선물', '어린이날외식', '감사선물']
 tokens = ['마을', '강원도', '한우', '맛집', '홍천', '평창', '어버이날', '어린이날외식', '감사', '선물']
 
@@ -16,6 +14,21 @@ def is_english(string):
             return True
     return False
 
+def get_only_korean(string):
+    res = ''
+    korean = False
+    for char in string:
+        if ('0' <= char and char <= '9'):
+            res += char
+        elif ('가' <= char and char <= '힣'):
+            res += char
+            korean = True
+            
+    if not korean:
+        return ''
+    return res
+    
+            
 
 def make_next_prob(prob_dict, word_before, word_after):
     if is_english(word_before) or is_english(word_after):
@@ -100,6 +113,13 @@ def extend_words(model_token, prob_dict, start_word, word_threshold, next_thresh
             probability = similar_word[1] * curr_prob
             if probability >= word_threshold:
                 pool.append((prev_word, similar_word[0], probability * 0.95))
+                
+                # for each transition, the word can be extended by using previous probability
+                for next_word in get_next_prob(prob_dict, curr_word, 50):
+                    next_prob = next_word[1] * probability
+                    if next_prob >= next_threshold and (prev_word+similar_word[0]).find(next_word[0]) == -1:
+                        pool.append((prev_word + similar_word[0], next_word[0], probability * 0.95))
+                
         # extend to next word
         for next_word in get_next_prob(prob_dict, curr_word, 50):
             probability = next_word[1] * curr_prob

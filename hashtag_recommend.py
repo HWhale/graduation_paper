@@ -10,7 +10,6 @@ import numpy as np
 import requests
 import os
 import csv
-from matplotlib import pyplot as plt
 from PIL import Image
 from keras.models import Model
 import heapq

@@ -10,7 +10,7 @@ import os
 import token_processor as tp
 
 
-def refine(name_list, dir_name, min_freq):
+def refine(name_list, dir_name, min_freq, min_tag, max_tag):
     tag_dict = {}
     line_cnt = 0
     for name in name_list:
@@ -62,7 +62,7 @@ def refine(name_list, dir_name, min_freq):
                         if tag in tag_dict:
                             tags_after += '#' + tag
                             tags_after_list.append(tag)
-                    if tags_after != '':
+                    if min_tag <= len(tags_after_list) and len(tags_after_list) <= max_tag:
                         tokens = tp.subst_split(tags_after_list)
                         token_str = ''
                         for token in tokens:
@@ -90,4 +90,4 @@ name_list = [
         '휴가'
         ]
 
-tag_dict = refine(name_list, 'data/unrefined', 30)
+tag_dict = refine(name_list, 'data/unrefined', 30, 5, 20)
